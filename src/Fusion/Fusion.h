@@ -19,7 +19,6 @@ extern "C" {
 #include "FusionAxes.h"
 #include "FusionCalibration.h"
 #include "FusionCompass.h"
-#include "FusionConvention.h"
 #include "FusionMath.h"
 #include "FusionOffset.h"
 

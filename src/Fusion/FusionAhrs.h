@@ -11,7 +11,6 @@
 //------------------------------------------------------------------------------
 // Includes
 
-#include "FusionConvention.h"
 #include "FusionMath.h"
 #include <stdbool.h>
 
@@ -22,12 +21,10 @@
  * @brief AHRS algorithm settings.
  */
 typedef struct {
-    FusionConvention convention;
     float gain;
-    float gyroscopeRange;
     float accelerationRejection;
     float magneticRejection;
-    unsigned int recoveryTriggerPeriod;
+    unsigned int rejectionTimeout;
 } FusionAhrsSettings;
 
 /**
@@ -41,15 +38,14 @@ typedef struct {
     bool initialising;
     float rampedGain;
     float rampedGainStep;
-    bool angularRateRecovery;
     FusionVector halfAccelerometerFeedback;
     FusionVector halfMagnetometerFeedback;
     bool accelerometerIgnored;
-    int accelerationRecoveryTrigger;
-    int accelerationRecoveryTimeout;
+    unsigned int accelerationRejectionTimer;
+    bool accelerationRejectionTimeout;
     bool magnetometerIgnored;
-    int magneticRecoveryTrigger;
-    int magneticRecoveryTimeout;
+    unsigned int magneticRejectionTimer;
+    bool magneticRejectionTimeout;
 } FusionAhrs;
 
 /**
@@ -58,10 +54,10 @@ typedef struct {
 typedef struct {
     float accelerationError;
     bool accelerometerIgnored;
-    float accelerationRecoveryTrigger;
+    float accelerationRejectionTimer;
     float magneticError;
     bool magnetometerIgnored;
-    float magneticRecoveryTrigger;
+    float magneticRejectionTimer;
 } FusionAhrsInternalStates;
 
 /**
@@ -69,9 +65,10 @@ typedef struct {
  */
 typedef struct {
     bool initialising;
-    bool angularRateRecovery;
-    bool accelerationRecovery;
-    bool magneticRecovery;
+    bool accelerationRejectionWarning;
+    bool accelerationRejectionTimeout;
+    bool magneticRejectionWarning;
+    bool magneticRejectionTimeout;
 } FusionAhrsFlags;
 
 //------------------------------------------------------------------------------
@@ -91,15 +88,13 @@ void FusionAhrsUpdateExternalHeading(FusionAhrs *const ahrs, const FusionVector 
 
 FusionQuaternion FusionAhrsGetQuaternion(const FusionAhrs *const ahrs);
 
-void FusionAhrsSetQuaternion(FusionAhrs *const ahrs, const FusionQuaternion quaternion);
-
 FusionVector FusionAhrsGetLinearAcceleration(const FusionAhrs *const ahrs);
 
 FusionVector FusionAhrsGetEarthAcceleration(const FusionAhrs *const ahrs);
 
 FusionAhrsInternalStates FusionAhrsGetInternalStates(const FusionAhrs *const ahrs);
 
-FusionAhrsFlags FusionAhrsGetFlags(const FusionAhrs *const ahrs);
+FusionAhrsFlags FusionAhrsGetFlags(FusionAhrs *const ahrs);
 
 void FusionAhrsSetHeading(FusionAhrs *const ahrs, const float heading);
 
