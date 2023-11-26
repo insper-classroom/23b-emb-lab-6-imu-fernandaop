@@ -6,9 +6,6 @@
 #include "conf_board.h"
 #include <mcu6050.h>
 #include <Fusion/Fusion.h>
-//include math
-#include <math.h>
-
 /************************************************************************/
 /* DEFINES                                                              */
 /************************************************************************/
@@ -175,11 +172,8 @@ void mcu6050_i2c_bus_init(void)
 static void task_imu(void *pvParameters) {
 	mcu6050_i2c_bus_init();
 	printf("Iniciando IMU\r \n");
-	/* Inicializa Fun??o de fus?o */
 	FusionAhrs ahrs;
 	FusionAhrsInitialise(&ahrs);
-	printf("Iniciando fusion\r \n");
-	/* buffer para recebimento de dados */
 	uint8_t bufferRX[10];
 	uint8_t bufferTX[10];
 	
@@ -217,7 +211,7 @@ static void task_imu(void *pvParameters) {
 		printf("SUCESSO!");
 	}
 	else{
-		printf("Incorreto :(");
+		printf("Incorreto");
 	}
 	
 	// Set Clock source
@@ -362,7 +356,7 @@ static void task_orientacao(void *pvParameters) {
 static void task_house_down(void *pvParameters) {
 	for (;;) {
 		if (xSemaphoreTake(xSemaphoreHouseDown, 10) == pdTRUE) {
-			printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+			printf("A");
 			for (int i = 0; i < 7; i++) {
 				pin_toggle(LED_PIO, LED_IDX_MASK);
 				vTaskDelay(100);
