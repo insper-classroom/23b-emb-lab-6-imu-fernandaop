@@ -428,4 +428,3 @@ int main(void) {
 	/* Will only get here if there was insufficient memory to create the idle task. */
 	return 0;
 }
-\
