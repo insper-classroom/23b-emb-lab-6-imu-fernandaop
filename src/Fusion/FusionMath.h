@@ -457,4 +457,3 @@ static inline FusionEuler FusionQuaternionToEuler(const FusionQuaternion quatern
 
 //------------------------------------------------------------------------------
 // End of file
-
