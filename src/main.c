@@ -179,21 +179,6 @@ static void task_imu(void *pvParameters) {
 	FusionAhrs ahrs;
 	FusionAhrsInitialise(&ahrs);
 	printf("Iniciando fusion\r \n");
-	/* buffer para recebimento de dados */
-	uint8_t bufferRX[10];
-	uint8_t bufferTX[10];
-	for(;;){
-	int16_t  raw_acc_x, raw_acc_y, raw_acc_z;
-	volatile uint8_t  raw_acc_xHigh, raw_acc_yHigh, raw_acc_zHigh;
-	volatile uint8_t  raw_acc_xLow,  raw_acc_yLow,  raw_acc_zLow;
-	float proc_acc_x, proc_acc_y, proc_acc_z;
-
-	int16_t  raw_gyr_x, raw_gyr_y, raw_gyr_z;
-	volatile uint8_t  raw_gyr_xHigh, raw_gyr_yHigh, raw_gyr_zHigh;
-	volatile uint8_t  raw_gyr_xLow,  raw_gyr_yLow,  raw_gyr_zLow;
-	float proc_gyr_x, proc_gyr_y, proc_gyr_z;
-
-
 	/* resultado da fun��o */
 	uint8_t rtn;
 	
@@ -242,6 +227,18 @@ static void task_imu(void *pvParameters) {
 	int d = 4;
 	printf("Iniciando leitura de dados\n");
 	while(1) {
+		/* buffer para recebimento de dados */
+		uint8_t bufferRX[10];
+		uint8_t bufferTX[10];
+		int16_t  raw_acc_x, raw_acc_y, raw_acc_z;
+		volatile uint8_t  raw_acc_xHigh, raw_acc_yHigh, raw_acc_zHigh;
+		volatile uint8_t  raw_acc_xLow,  raw_acc_yLow,  raw_acc_zLow;
+		float proc_acc_x, proc_acc_y, proc_acc_z;
+
+		int16_t  raw_gyr_x, raw_gyr_y, raw_gyr_z;
+		volatile uint8_t  raw_gyr_xHigh, raw_gyr_yHigh, raw_gyr_zHigh;
+		volatile uint8_t  raw_gyr_xLow,  raw_gyr_yLow,  raw_gyr_zLow;
+		float proc_gyr_x, proc_gyr_y, proc_gyr_z;
 		// Le valor do acc X High e Low
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_XOUT_H, &raw_acc_xHigh, 1);
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_XOUT_L, &raw_acc_xLow,  1);
@@ -331,7 +328,7 @@ static void task_imu(void *pvParameters) {
 		vTaskDelay(10);
 	}
 }
-}
+
 
 static void task_orientacao(void *pvParameters) {
 	int direcao;
