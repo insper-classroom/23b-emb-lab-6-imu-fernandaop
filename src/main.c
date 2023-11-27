@@ -47,7 +47,7 @@ SemaphoreHandle_t xSemaphoreHouseDown;
 QueueHandle_t xQueueOrientacao;
 
 /************************************************************************/
-/* PROTOTYPES                                                           */
+/* PROTOTYPE                                                           */
 /************************************************************************/
 
 void pin_toggle(Pio *pio, uint32_t mask);
@@ -175,7 +175,7 @@ void mcu6050_i2c_bus_init(void)
 static void task_imu(void *pvParameters) {
 	mcu6050_i2c_bus_init();
 	printf("Iniciando IMU\r \n");
-	/* Inicializa Função de fusão */
+	/* Inicializa Funï¿½ï¿½o de fusï¿½o */
 	FusionAhrs ahrs;
 	FusionAhrsInitialise(&ahrs);
 	printf("Iniciando fusion\r \n");
@@ -194,7 +194,7 @@ static void task_imu(void *pvParameters) {
 	float proc_gyr_x, proc_gyr_y, proc_gyr_z;
 
 
-	/* resultado da função */
+	/* resultado da funï¿½ï¿½o */
 	uint8_t rtn;
 	
 	rtn = twihs_probe(TWIHS2, MPU6050_DEFAULT_ADDRESS);
@@ -204,7 +204,7 @@ static void task_imu(void *pvParameters) {
 		printf("[DADO] [i2c] probe OK\n" );
 	}
 	
-	// Lê registrador WHO AM I
+	// Lï¿½ registrador WHO AM I
 	rtn = mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_WHO_AM_I, bufferRX, 1);
 	if(rtn != TWIHS_SUCCESS){
 		printf("[ERRO] [i2c] [read] \n");
@@ -232,8 +232,8 @@ static void task_imu(void *pvParameters) {
 	if(rtn != TWIHS_SUCCESS)
 	printf("[ERRO] [i2c] [write] \n");
 
-	// Configura range giroscopio para operar com 250 °/s
-	bufferTX[0] = 0x00; // 250 °/s
+	// Configura range giroscopio para operar com 250 ï¿½/s
+	bufferTX[0] = 0x00; // 250 ï¿½/s
 	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, bufferTX, 1);
 	if(rtn != TWIHS_SUCCESS)
 	printf("[ERRO] [i2c] [write] \n");
@@ -254,7 +254,7 @@ static void task_imu(void *pvParameters) {
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_ZOUT_H, &raw_acc_zHigh, 1);
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_ZOUT_L, &raw_acc_zLow,  1);
 
-		// Dados são do tipo complemento de dois
+		// Dados sï¿½o do tipo complemento de dois
 		raw_acc_x = (raw_acc_xHigh << 8) | (raw_acc_xLow << 0);
 		raw_acc_y = (raw_acc_yHigh << 8) | (raw_acc_yLow << 0);
 		raw_acc_z = (raw_acc_zHigh << 8) | (raw_acc_zLow << 0);
@@ -271,7 +271,7 @@ static void task_imu(void *pvParameters) {
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_ZOUT_H, &raw_gyr_zHigh, 1);
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_ZOUT_L, &raw_gyr_zLow,  1);
 
-		// Dados são do tipo complemento de dois
+		// Dados sï¿½o do tipo complemento de dois
 		raw_gyr_x = (raw_gyr_xHigh << 8) | (raw_gyr_xLow << 0);
 		raw_gyr_y = (raw_gyr_yHigh << 8) | (raw_gyr_yLow << 0);
 		raw_gyr_z = (raw_gyr_zHigh << 8) | (raw_gyr_zLow << 0);
