@@ -179,54 +179,55 @@ static void task_imu(void *pvParameters) {
 	FusionAhrs ahrs;
 	FusionAhrsInitialise(&ahrs);
 	printf("Iniciando fusion\r \n");
-	/* resultado da fun��o */
-	uint8_t rtn;
-	
-	rtn = twihs_probe(TWIHS2, MPU6050_DEFAULT_ADDRESS);
-	if(rtn != TWIHS_SUCCESS){
-		printf("[ERRO] [i2c] [probe] \n");
-		} else {
-		printf("[DADO] [i2c] probe OK\n" );
-	}
-	
-	// L� registrador WHO AM I
-	rtn = mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_WHO_AM_I, bufferRX, 1);
-	if(rtn != TWIHS_SUCCESS){
-		printf("[ERRO] [i2c] [read] \n");
-		} else {
-		printf("[DADO] [i2c] %x:%x", MPU6050_RA_WHO_AM_I, bufferRX[0]);
-		printf("%x", bufferRX[0]);
-	}
-	
-	if (bufferRX[0] == 104){
-		printf("SUCESSO!");
-	}
-	else{
-		printf("Incorreto :(");
-	}
-	
-	// Set Clock source
-	bufferTX[0] = MPU6050_CLOCK_PLL_XGYRO;
-	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, bufferTX, 1);
-	if(rtn != TWIHS_SUCCESS)
-	printf("[ERRO] [i2c] [write] \n");
 
-	// Aceletromtro em 2G
-	bufferTX[0] = MPU6050_ACCEL_FS_2 << MPU6050_ACONFIG_AFS_SEL_BIT;
-	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, bufferTX, 1);
-	if(rtn != TWIHS_SUCCESS)
-	printf("[ERRO] [i2c] [write] \n");
-
-	// Configura range giroscopio para operar com 250 �/s
-	bufferTX[0] = 0x00; // 250 �/s
-	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, bufferTX, 1);
-	if(rtn != TWIHS_SUCCESS)
-	printf("[ERRO] [i2c] [write] \n");
-	float valor_anterior_yaw = 0.0;
-	float roll, pitch, yaw;
-	int d = 4;
-	printf("Iniciando leitura de dados\n");
 	while(1) {
+			/* resultado da fun��o */
+		uint8_t rtn;
+		
+		rtn = twihs_probe(TWIHS2, MPU6050_DEFAULT_ADDRESS);
+		if(rtn != TWIHS_SUCCESS){
+			printf("[ERRO] [i2c] [probe] \n");
+			} else {
+			printf("[DADO] [i2c] probe OK\n" );
+		}
+		
+		// L� registrador WHO AM I
+		rtn = mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_WHO_AM_I, bufferRX, 1);
+		if(rtn != TWIHS_SUCCESS){
+			printf("[ERRO] [i2c] [read] \n");
+			} else {
+			printf("[DADO] [i2c] %x:%x", MPU6050_RA_WHO_AM_I, bufferRX[0]);
+			printf("%x", bufferRX[0]);
+		}
+		
+		if (bufferRX[0] == 104){
+			printf("SUCESSO!");
+		}
+		else{
+			printf("Incorreto :(");
+		}
+		
+		// Set Clock source
+		bufferTX[0] = MPU6050_CLOCK_PLL_XGYRO;
+		rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, bufferTX, 1);
+		if(rtn != TWIHS_SUCCESS)
+		printf("[ERRO] [i2c] [write] \n");
+
+		// Aceletromtro em 2G
+		bufferTX[0] = MPU6050_ACCEL_FS_2 << MPU6050_ACONFIG_AFS_SEL_BIT;
+		rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, bufferTX, 1);
+		if(rtn != TWIHS_SUCCESS)
+		printf("[ERRO] [i2c] [write] \n");
+
+		// Configura range giroscopio para operar com 250 �/s
+		bufferTX[0] = 0x00; // 250 �/s
+		rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, bufferTX, 1);
+		if(rtn != TWIHS_SUCCESS)
+		printf("[ERRO] [i2c] [write] \n");
+		printf("Iniciando leitura de dados\n");
+		float valor_anterior_yaw = 0.0;
+		float roll, pitch, yaw;
+		int d = 4;
 		/* buffer para recebimento de dados */
 		uint8_t bufferRX[10];
 		uint8_t bufferTX[10];
