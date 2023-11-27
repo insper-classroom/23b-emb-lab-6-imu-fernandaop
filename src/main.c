@@ -192,8 +192,6 @@ static void task_imu(void *pvParameters) {
 	volatile uint8_t  raw_gyr_xHigh, raw_gyr_yHigh, raw_gyr_zHigh;
 	volatile uint8_t  raw_gyr_xLow,  raw_gyr_yLow,  raw_gyr_zLow;
 	float proc_gyr_x, proc_gyr_y, proc_gyr_z;
-
-
 	/* resultado da fun��o */
 	uint8_t rtn;
 	
