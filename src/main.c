@@ -1,25 +1,22 @@
 /*
- * Example RTOS Atmel Studio
- */
+* Example RTOS Atmel Studio
+*/
 
-#include "conf_board.h"
 #include <asf.h>
-#include mcu6050.h
-#include "Fusion/Fusion.h"
+#include "conf_board.h"
+#include <mcu6050.h>
+#include <Fusion/Fusion.h>
+//include math
 #include <math.h>
+
 /************************************************************************/
 /* DEFINES                                                              */
 /************************************************************************/
 
-#define TASK_LED_STACK_SIZE (1024 / sizeof(portSTACK_TYPE))
-#define TASK_LED_STACK_PRIORITY (tskIDLE_PRIORITY)
-#define TASK_IMU_STACK_SIZE (1024 / sizeof(portSTACK_TYPE))
-#define TASK_IMU_STACK_PRIORITY (tskIDLE_PRIORITY)
-#define LED_PIO PIOC
-#define LED_PIO_ID ID_PIOC
-#define LED_IDX 8u
-#define LED_IDX_MASK (1u << LED_IDX)
-#define ACCELERATION_THRESHOLD 9.5
+#define TASK_MONITOR_STACK_SIZE            (2048/sizeof(portSTACK_TYPE))
+#define TASK_MONITOR_STACK_PRIORITY        (tskIDLE_PRIORITY)
+#define TASK_LED_STACK_SIZE                (1024/sizeof(portSTACK_TYPE))
+#define TASK_LED_STACK_PRIORITY            (tskIDLE_PRIORITY)
 
 #define LED_PIO       PIOC
 #define LED_PIO_ID    ID_PIOC
@@ -46,7 +43,7 @@
 #define TASK_STACK_PRIORITY            (tskIDLE_PRIORITY)
 
 //fila
-SemaphoreHandle_t xSemaphore;
+SemaphoreHandle_t xSemaphoreHouseDown;
 QueueHandle_t xQueueOrientacao;
 
 /************************************************************************/
@@ -56,33 +53,33 @@ QueueHandle_t xQueueOrientacao;
 void pin_toggle(Pio *pio, uint32_t mask);
 void LED_init(int estado);
 static void configure_console(void);
+
+int8_t mcu6050_i2c_bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
+int8_t mcu6050_i2c_bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
 /************************************************************************/
 /* RTOS Hooks                                                           */
 /************************************************************************/
 
-int8_t mcu6050_i2c_bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
-int8_t mcu6050_i2c_bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
-                                          signed char *pcTaskName);
+signed char *pcTaskName);
 extern void vApplicationIdleHook(void);
 extern void vApplicationTickHook(void);
 extern void vApplicationMallocFailedHook(void);
 extern void xPortSysTickHandler(void);
-static void task_house_down(void *pvParameters);
+
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
-                                          signed char *pcTaskName) {
-  printf("stack overflow %x %s\r\n", pxTask, (portCHAR *)pcTaskName);
-  for (;;) {
-  }
+signed char *pcTaskName) {
+	printf("stack overflow %x %s\r\n", pxTask, (portCHAR *)pcTaskName);
+	for (;;) { }
 }
 
-extern void vApplicationIdleHook(void) {}
+extern void vApplicationIdleHook(void) { }
 
-extern void vApplicationTickHook(void) {}
+extern void vApplicationTickHook(void) { }
 
-extern void vApplicationMallocFailedHook(void) {
-  configASSERT((volatile void *)NULL);
-}
+extern void vApplicationMallocFailedHook(void) { configASSERT( ( volatile void * ) NULL ); }
+
+
 //create enum com ESQUERDA, FRENTE, DIREITA
 enum orientacao{
 	ESQUERDA,
@@ -92,22 +89,36 @@ enum orientacao{
 /************************************************************************/
 /* Funcoes                                                              */
 /************************************************************************/
-void mcu6050_i2c_bus_init(void)
-{
-	/** Enable TWIHS port to control PIO pins */
-	pmc_enable_periph_clk(ID_PIOD);
-	pio_set_peripheral(PIOD, PIO_TYPE_PIO_PERIPH_C, 1 << 28);
-	pio_set_peripheral(PIOD, PIO_TYPE_PIO_PERIPH_C, 1 << 27);
-	
-	twihs_options_t mcu6050_option;
-	pmc_enable_periph_clk(ID_TWIHS2);
 
-	/* Configure the options of TWI driver */
-	mcu6050_option.master_clk = sysclk_get_cpu_hz();
-	mcu6050_option.speed      = 40000;
-	twihs_master_init(TWIHS2, &mcu6050_option);
+void pin_toggle(Pio *pio, uint32_t mask){
+	if(pio_get_output_data_status(pio, mask))
+	pio_clear(pio, mask);
+	else
+	pio_set(pio,mask);
 }
-int8_t mcu6050_i2c_bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt)
+
+void LED_init(int estado) {
+	pmc_enable_periph_clk(LED_PIO_ID);
+	pio_set_output(LED_PIO, LED_IDX_MASK, estado, 0, 0);
+	pmc_enable_periph_clk(LED1_ID);
+	pmc_enable_periph_clk(LED2_ID);
+	pmc_enable_periph_clk(LED3_ID);
+	pio_configure(LED1, PIO_OUTPUT_0, LED1_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED2, PIO_OUTPUT_0, LED2_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED3, PIO_OUTPUT_0, LED3_IDX_MASK, PIO_DEFAULT);
+};
+
+static void configure_console(void) {
+	const usart_serial_options_t uart_serial_options = {
+		.baudrate = CONF_UART_BAUDRATE,
+		.charlength = CONF_UART_CHAR_LENGTH,
+		.paritytype = CONF_UART_PARITY,
+		.stopbits = CONF_UART_STOP_BITS,
+	};
+
+	stdio_serial_init(CONF_UART, &uart_serial_options);
+	setbuf(stdout, NULL);
+}int8_t mcu6050_i2c_bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt)
 {
 	int32_t ierror = 0x00;
 
@@ -140,74 +151,27 @@ int8_t mcu6050_i2c_bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_dat
 	return (int8_t)ierror;
 }
 
-void pin_toggle(Pio *pio, uint32_t mask){
-	if(pio_get_output_data_status(pio, mask))
-	pio_clear(pio, mask);
-	else
-	pio_set(pio,mask);
-}
+void mcu6050_i2c_bus_init(void)
+{
+	twihs_options_t mcu6050_option;
+	pmc_enable_periph_clk(ID_TWIHS2);
 
-void LED_init(int estado) {
-	pmc_enable_periph_clk(LED_PIO_ID);
-	pio_set_output(LED_PIO, LED_IDX_MASK, estado, 0, 0);
-	pmc_enable_periph_clk(LED1_ID);
-	pmc_enable_periph_clk(LED2_ID);
-	pmc_enable_periph_clk(LED3_ID);
-	pio_configure(LED1, PIO_OUTPUT_0, LED1_IDX_MASK, PIO_DEFAULT);
-	pio_configure(LED2, PIO_OUTPUT_0, LED2_IDX_MASK, PIO_DEFAULT);
-	pio_configure(LED3, PIO_OUTPUT_0, LED3_IDX_MASK, PIO_DEFAULT);
-};
+	/* Configure the options of TWI driver */
+	mcu6050_option.master_clk = sysclk_get_cpu_hz();
+	mcu6050_option.speed      = 40000;
+	twihs_master_init(TWIHS2, &mcu6050_option);
+	
+	/** Enable TWIHS port to control PIO pins */
+	pmc_enable_periph_clk(ID_PIOD);
+	pio_set_peripheral(PIOD, PIO_TYPE_PIO_PERIPH_C, 1 << 28);
+	pio_set_peripheral(PIOD, PIO_TYPE_PIO_PERIPH_C, 1 << 27);
 
-static void configure_console(void) {
-  const usart_serial_options_t uart_serial_options = {
-      .baudrate = CONF_UART_BAUDRATE,
-      .charlength = CONF_UART_CHAR_LENGTH,
-      .paritytype = CONF_UART_PARITY,
-      .stopbits = CONF_UART_STOP_BITS,
-  };
-
-  stdio_serial_init(CONF_UART, &uart_serial_options);
-  setbuf(stdout, NULL);
 }
 
 /************************************************************************/
 /* Tasks                                                                */
 /************************************************************************/
-static void task_house_down(void *pvParameters) {
-	(void)pvParameters;
 
-	while (1) {
-		// Aguarda o sem�foro ser liberado
-		if (xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
-			// C�digo para piscar o LED da placa
-			LED_init(1);
-			vTaskDelay(100);
-			LED_init(0);
-		}
-	}
-}
-
-// Fun��o para calcular o m�dulo do vetor de acelera��o
-double calculate_acceleration_module(int16_t x, int16_t y, int16_t z) {
-	return sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
-}
-
-// Fun��o para ler dados do aceler�metro e verificar a condi��o de batida
-void check_for_impact() {
-	// Leitura dos dados do aceler�metro (substitua pelos valores reais)
-	int16_t accel_x = 100;  // Substitua pelos valores reais
-	int16_t accel_y = 200;  // Substitua pelos valores reais
-	int16_t accel_z = 300;  // Substitua pelos valores reais
-
-	// C�lculo do m�dulo do vetor de acelera��o
-	double acceleration_module = calculate_acceleration_module(accel_x, accel_y, accel_z);
-
-	// Verifica se a condi��o de batida foi atendida
-	if (acceleration_module > ACCELERATION_THRESHOLD) {
-		// Libera o sem�foro para acionar a tarefa
-		xSemaphoreGive(xSemaphore);
-	}
-}
 static void task_imu(void *pvParameters) {
 	mcu6050_i2c_bus_init();
 	printf("Iniciando IMU\r \n");
@@ -218,7 +182,7 @@ static void task_imu(void *pvParameters) {
 	/* buffer para recebimento de dados */
 	uint8_t bufferRX[10];
 	uint8_t bufferTX[10];
-	
+	for(;;){
 	int16_t  raw_acc_x, raw_acc_y, raw_acc_z;
 	volatile uint8_t  raw_acc_xHigh, raw_acc_yHigh, raw_acc_zHigh;
 	volatile uint8_t  raw_acc_xLow,  raw_acc_yLow,  raw_acc_zLow;
@@ -367,6 +331,7 @@ static void task_imu(void *pvParameters) {
 		vTaskDelay(10);
 	}
 }
+}
 
 static void task_orientacao(void *pvParameters) {
 	int direcao;
@@ -395,62 +360,71 @@ static void task_orientacao(void *pvParameters) {
 		}
 	}
 }
-
-static void task_led(void *pvParameters) {
-  LED_init(1);
-  for (;;) {
-    pin_toggle(LED_PIO, LED_IDX_MASK);
-    vTaskDelay(1000);
-  }
+static void task_house_down(void *pvParameters) {
+	for (;;) {
+		if (xSemaphoreTake(xSemaphoreHouseDown, 10) == pdTRUE) {
+			for (int i = 0; i < 7; i++) {
+				pin_toggle(LED_PIO, LED_IDX_MASK);
+				vTaskDelay(100);
+			}
+		}
+		else{
+			pio_set(LED_PIO,LED_IDX_MASK);
+		}
+	}
 }
+
+
+
 
 /************************************************************************/
 /* main                                                                */
 /************************************************************************/
 
 int main(void) {
-  sysclk_init();
-  board_init();
+	sysclk_init();
+	board_init();
+	LED_init(0);
+	/* Initialize the console uart */
+	configure_console();
 
-  /* Initialize the console uart */
-  configure_console();
+	/* Output demo information. */
+	printf("-- Freertos Example --\n\r");
+	printf("-- %s\n\r", BOARD_NAME);
+	printf("-- Compiled: %s %s --\n\r", __DATE__, __TIME__);
 
-  /* Output demo information. */
-  printf("-- Freertos Example --\n\r");
-  printf("-- %s\n\r", BOARD_NAME);
-  printf("-- Compiled: %s %s --\n\r", __DATE__, __TIME__);
-  xSemaphore = xSemaphoreCreateBinary();
-  	//create task orientacao
+	// //create queue
+	xQueueOrientacao = xQueueCreate( 32, sizeof(uint32_t));
+	if (xQueueOrientacao == NULL){
+		printf("falha em criar a queue xQueueModo \n");
+	}
+	//create semaphore
+	xSemaphoreHouseDown = xSemaphoreCreateBinary();
+	if (xSemaphoreHouseDown == NULL){
+		printf("falha em criar o semaforo xSemaphore \n");
+	}
+
+
+	//create task orientacao
 	if (xTaskCreate(task_orientacao, "Orientacao", TASK_STACK_SIZE, NULL,
 	TASK_STACK_PRIORITY, NULL) != pdPASS) {
 		printf("Failed to create test orientacao task\r\n");
 	}
 
-  if (xTaskCreate(task_imu, "IMU", TASK_IMU_STACK_SIZE, NULL,
-                  TASK_IMU_STACK_PRIORITY, NULL) != pdPASS) {
-    printf("Failed to create test IMU task\r\n");
-  }
-  if (xSemaphore == NULL) {
-	  printf("Falha ao criar o sem�foro\n");
-	  return 1;
-  }
+	//create task to read imu
+	if (xTaskCreate(task_imu, "IMU", TASK_STACK_SIZE, NULL,
+	TASK_STACK_PRIORITY, NULL) != pdPASS) {
+		printf("Failed to create test imu task\r\n");
+	}
 
-  // Cria��o da tarefa house_down
-  if (xTaskCreate(task_house_down, "HouseDown", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
-	  printf("Falha ao criar a tarefa house_down\n");
-	  return 1;
-  }
+	//create task howse down
+	if (xTaskCreate(task_house_down, "House Down", TASK_STACK_SIZE, NULL,
+	TASK_STACK_PRIORITY, NULL) != pdPASS) {
+		printf("Failed to create test imu task\r\n");
+	}
+	/* Start the scheduler. */
+	vTaskStartScheduler();
 
-  /* Create task to make led blink */
-  if (xTaskCreate(task_led, "Led", TASK_LED_STACK_SIZE, NULL,
-                  TASK_LED_STACK_PRIORITY, NULL) != pdPASS) {
-    printf("Failed to create test led task\r\n");
-  }
-
-  /* Start the scheduler. */
-  vTaskStartScheduler();
-
-  /* Will only get here if there was insufficient memory to create the idle
-   * task. */
-  return 0;
+	/* Will only get here if there was insufficient memory to create the idle task. */
+	return 0;
 }
