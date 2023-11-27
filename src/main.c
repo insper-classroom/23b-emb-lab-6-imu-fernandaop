@@ -183,7 +183,8 @@ static void task_imu(void *pvParameters) {
 	while(1) {
 			/* resultado da fun��o */
 		uint8_t rtn;
-		
+		uint8_t bufferRX[10];
+		uint8_t bufferTX[10];
 		rtn = twihs_probe(TWIHS2, MPU6050_DEFAULT_ADDRESS);
 		if(rtn != TWIHS_SUCCESS){
 			printf("[ERRO] [i2c] [probe] \n");
@@ -229,8 +230,6 @@ static void task_imu(void *pvParameters) {
 		float roll, pitch, yaw;
 		int d = 4;
 		/* buffer para recebimento de dados */
-		uint8_t bufferRX[10];
-		uint8_t bufferTX[10];
 		int16_t  raw_acc_x, raw_acc_y, raw_acc_z;
 		volatile uint8_t  raw_acc_xHigh, raw_acc_yHigh, raw_acc_zHigh;
 		volatile uint8_t  raw_acc_xLow,  raw_acc_yLow,  raw_acc_zLow;
