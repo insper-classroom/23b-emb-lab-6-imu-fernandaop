@@ -24,6 +24,8 @@ src\ASF\sam\drivers\pmc\pmc.c
 
 src\ASF\sam\drivers\pmc\sleep.c
 
+src\ASF\sam\drivers\twihs\twihs.c
+
 src\ASF\sam\drivers\uart\uart.c
 
 src\ASF\sam\drivers\usart\usart.c
