@@ -235,9 +235,6 @@ static void task_imu(void *pvParameters) {
 	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, bufferTX, 1);
 	if(rtn != TWIHS_SUCCESS)
 	printf("[ERRO] [i2c] [write] \n");
-	float valor_anterior_yaw = 0.0;
-	float roll, pitch, yaw;
-	int d = 4;
 	printf("Iniciando leitura de dados\n");
 	while(1) {
 		// Le valor do acc X High e Low
