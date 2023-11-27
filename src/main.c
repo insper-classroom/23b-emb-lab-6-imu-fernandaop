@@ -5,7 +5,8 @@
 #include "conf_board.h"
 #include <asf.h>
 #include mcu6050.h
-
+#include "Fusion/Fusion.h"
+#include <math.h>
 /************************************************************************/
 /* DEFINES                                                              */
 /************************************************************************/
@@ -18,6 +19,35 @@
 #define LED_PIO_ID ID_PIOC
 #define LED_IDX 8u
 #define LED_IDX_MASK (1u << LED_IDX)
+#define ACCELERATION_THRESHOLD 9.5
+
+#define LED_PIO       PIOC
+#define LED_PIO_ID    ID_PIOC
+#define LED_IDX       8u
+#define LED_IDX_MASK  (1u << LED_IDX)
+
+#define LED1           PIOA
+#define LED1_ID        ID_PIOA
+#define LED1_IDX       0
+#define LED1_IDX_MASK  (1 << LED1_IDX)
+
+#define LED2           PIOC
+#define LED2_ID        ID_PIOC
+#define LED2_IDX       30
+#define LED2_IDX_MASK  (1 << LED2_IDX)
+
+#define LED3           PIOB
+#define LED3_ID        ID_PIOB
+#define LED3_IDX       2
+#define LED3_IDX_MASK  (1 << LED3_IDX)
+
+/** RTOS  */
+#define TASK_STACK_SIZE                (1024*6/sizeof(portSTACK_TYPE))
+#define TASK_STACK_PRIORITY            (tskIDLE_PRIORITY)
+
+//fila
+SemaphoreHandle_t xSemaphore;
+QueueHandle_t xQueueOrientacao;
 
 /************************************************************************/
 /* PROTOTYPES                                                           */
@@ -26,18 +56,19 @@
 void pin_toggle(Pio *pio, uint32_t mask);
 void LED_init(int estado);
 static void configure_console(void);
-
 /************************************************************************/
 /* RTOS Hooks                                                           */
 /************************************************************************/
 
+int8_t mcu6050_i2c_bus_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
+int8_t mcu6050_i2c_bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint8_t cnt);
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
                                           signed char *pcTaskName);
 extern void vApplicationIdleHook(void);
 extern void vApplicationTickHook(void);
 extern void vApplicationMallocFailedHook(void);
 extern void xPortSysTickHandler(void);
-
+static void task_house_down(void *pvParameters);
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,
                                           signed char *pcTaskName) {
   printf("stack overflow %x %s\r\n", pxTask, (portCHAR *)pcTaskName);
@@ -52,7 +83,12 @@ extern void vApplicationTickHook(void) {}
 extern void vApplicationMallocFailedHook(void) {
   configASSERT((volatile void *)NULL);
 }
-
+//create enum com ESQUERDA, FRENTE, DIREITA
+enum orientacao{
+	ESQUERDA,
+	FRENTE,
+	DIREITA
+};
 /************************************************************************/
 /* Funcoes                                                              */
 /************************************************************************/
@@ -104,16 +140,22 @@ int8_t mcu6050_i2c_bus_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_dat
 	return (int8_t)ierror;
 }
 
-void pin_toggle(Pio *pio, uint32_t mask) {
-  if (pio_get_output_data_status(pio, mask))
-    pio_clear(pio, mask);
-  else
-    pio_set(pio, mask);
+void pin_toggle(Pio *pio, uint32_t mask){
+	if(pio_get_output_data_status(pio, mask))
+	pio_clear(pio, mask);
+	else
+	pio_set(pio,mask);
 }
 
 void LED_init(int estado) {
-  pmc_enable_periph_clk(LED_PIO_ID);
-  pio_set_output(LED_PIO, LED_IDX_MASK, estado, 0, 0);
+	pmc_enable_periph_clk(LED_PIO_ID);
+	pio_set_output(LED_PIO, LED_IDX_MASK, estado, 0, 0);
+	pmc_enable_periph_clk(LED1_ID);
+	pmc_enable_periph_clk(LED2_ID);
+	pmc_enable_periph_clk(LED3_ID);
+	pio_configure(LED1, PIO_OUTPUT_0, LED1_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED2, PIO_OUTPUT_0, LED2_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED3, PIO_OUTPUT_0, LED3_IDX_MASK, PIO_DEFAULT);
 };
 
 static void configure_console(void) {
@@ -131,7 +173,52 @@ static void configure_console(void) {
 /************************************************************************/
 /* Tasks                                                                */
 /************************************************************************/
+static void task_house_down(void *pvParameters) {
+	(void)pvParameters;
+
+	while (1) {
+		// Aguarda o semï¿½foro ser liberado
+		if (xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
+			// Cï¿½digo para piscar o LED da placa
+			LED_init(1);
+			vTaskDelay(100);
+			LED_init(0);
+		}
+	}
+}
+
+// Funï¿½ï¿½o para calcular o mï¿½dulo do vetor de aceleraï¿½ï¿½o
+double calculate_acceleration_module(int16_t x, int16_t y, int16_t z) {
+	return sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
+}
+
+// Funï¿½ï¿½o para ler dados do acelerï¿½metro e verificar a condiï¿½ï¿½o de batida
+void check_for_impact() {
+	// Leitura dos dados do acelerï¿½metro (substitua pelos valores reais)
+	int16_t accel_x = 100;  // Substitua pelos valores reais
+	int16_t accel_y = 200;  // Substitua pelos valores reais
+	int16_t accel_z = 300;  // Substitua pelos valores reais
+
+	// Cï¿½lculo do mï¿½dulo do vetor de aceleraï¿½ï¿½o
+	double acceleration_module = calculate_acceleration_module(accel_x, accel_y, accel_z);
+
+	// Verifica se a condiï¿½ï¿½o de batida foi atendida
+	if (acceleration_module > ACCELERATION_THRESHOLD) {
+		// Libera o semï¿½foro para acionar a tarefa
+		xSemaphoreGive(xSemaphore);
+	}
+}
 static void task_imu(void *pvParameters) {
+	mcu6050_i2c_bus_init();
+	printf("Iniciando IMU\r \n");
+	/* Inicializa Funï¿½ï¿½o de fusï¿½o */
+	FusionAhrs ahrs;
+	FusionAhrsInitialise(&ahrs);
+	printf("Iniciando fusion\r \n");
+	/* buffer para recebimento de dados */
+	uint8_t bufferRX[10];
+	uint8_t bufferTX[10];
+	
 	int16_t  raw_acc_x, raw_acc_y, raw_acc_z;
 	volatile uint8_t  raw_acc_xHigh, raw_acc_yHigh, raw_acc_zHigh;
 	volatile uint8_t  raw_acc_xLow,  raw_acc_yLow,  raw_acc_zLow;
@@ -141,35 +228,34 @@ static void task_imu(void *pvParameters) {
 	volatile uint8_t  raw_gyr_xHigh, raw_gyr_yHigh, raw_gyr_zHigh;
 	volatile uint8_t  raw_gyr_xLow,  raw_gyr_yLow,  raw_gyr_zLow;
 	float proc_gyr_x, proc_gyr_y, proc_gyr_z;
-	
-	mcu6050_i2c_bus_init();
-	/* buffer para recebimento de dados */
-	uint8_t bufferRX[10];
-	uint8_t bufferTX[10];
 
-	/* resultado da função */
+
+	/* resultado da funï¿½ï¿½o */
 	uint8_t rtn;
+	
 	rtn = twihs_probe(TWIHS2, MPU6050_DEFAULT_ADDRESS);
 	if(rtn != TWIHS_SUCCESS){
 		printf("[ERRO] [i2c] [probe] \n");
 		} else {
 		printf("[DADO] [i2c] probe OK\n" );
 	}
-
-	// Lê registrador WHO_AM_I
+	
+	// Lï¿½ registrador WHO AM I
 	rtn = mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_WHO_AM_I, bufferRX, 1);
 	if(rtn != TWIHS_SUCCESS){
 		printf("[ERRO] [i2c] [read] \n");
 		} else {
-		printf("[DADO] [i2c] WHO_AM_I: %x\n", bufferRX[0]);
-
-		// Verifica se o valor lido é o esperado
-		if (bufferRX[0] == MPU6050_WHO_AM_I_DEFAULT) {
-			printf("[SUCESSO] WHO_AM_I é o valor esperado: %x\n", MPU6050_WHO_AM_I_DEFAULT);
-			} else {
-			printf("[ERRO] WHO_AM_I é diferente do valor esperado: %x\n", MPU6050_WHO_AM_I_DEFAULT);
-		}
+		printf("[DADO] [i2c] %x:%x", MPU6050_RA_WHO_AM_I, bufferRX[0]);
+		printf("%x", bufferRX[0]);
 	}
+	
+	if (bufferRX[0] == 104){
+		printf("SUCESSO!");
+	}
+	else{
+		printf("Incorreto :(");
+	}
+	
 	// Set Clock source
 	bufferTX[0] = MPU6050_CLOCK_PLL_XGYRO;
 	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, bufferTX, 1);
@@ -182,11 +268,15 @@ static void task_imu(void *pvParameters) {
 	if(rtn != TWIHS_SUCCESS)
 	printf("[ERRO] [i2c] [write] \n");
 
-	// Configura range giroscopio para operar com 250 °/s
-	bufferTX[0] = 0x00; // 250 °/s
+	// Configura range giroscopio para operar com 250 ï¿½/s
+	bufferTX[0] = 0x00; // 250 ï¿½/s
 	rtn = mcu6050_i2c_bus_write(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, bufferTX, 1);
 	if(rtn != TWIHS_SUCCESS)
 	printf("[ERRO] [i2c] [write] \n");
+	float valor_anterior_yaw = 0.0;
+	float roll, pitch, yaw;
+	int d = 4;
+	printf("Iniciando leitura de dados\n");
 	while(1) {
 		// Le valor do acc X High e Low
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_XOUT_H, &raw_acc_xHigh, 1);
@@ -200,7 +290,7 @@ static void task_imu(void *pvParameters) {
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_ZOUT_H, &raw_acc_zHigh, 1);
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_ZOUT_L, &raw_acc_zLow,  1);
 
-		// Dados são do tipo complemento de dois
+		// Dados sï¿½o do tipo complemento de dois
 		raw_acc_x = (raw_acc_xHigh << 8) | (raw_acc_xLow << 0);
 		raw_acc_y = (raw_acc_yHigh << 8) | (raw_acc_yLow << 0);
 		raw_acc_z = (raw_acc_zHigh << 8) | (raw_acc_zLow << 0);
@@ -217,7 +307,7 @@ static void task_imu(void *pvParameters) {
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_ZOUT_H, &raw_gyr_zHigh, 1);
 		mcu6050_i2c_bus_read(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_ZOUT_L, &raw_gyr_zLow,  1);
 
-		// Dados são do tipo complemento de dois
+		// Dados sï¿½o do tipo complemento de dois
 		raw_gyr_x = (raw_gyr_xHigh << 8) | (raw_gyr_xLow << 0);
 		raw_gyr_y = (raw_gyr_yHigh << 8) | (raw_gyr_yLow << 0);
 		raw_gyr_z = (raw_gyr_zHigh << 8) | (raw_gyr_zLow << 0);
@@ -230,9 +320,79 @@ static void task_imu(void *pvParameters) {
 		proc_gyr_x = (float)raw_gyr_x/131;
 		proc_gyr_y = (float)raw_gyr_y/131;
 		proc_gyr_z = (float)raw_gyr_z/131;
+		
+		//printf("proc_acc_x: %f \n", proc_acc_x);
+		//printf("proc_acc_y: %f \n", proc_acc_y);
+		//printf("proc_acc_z: %f \n", proc_acc_z);
+		
+		//printf("proc_gyr_x: %f \n", proc_gyr_x);
+		//printf("proc_gyr_y: %f \n", proc_gyr_y);
+		//printf("proc_gyr_z: %f \n", proc_gyr_z);
+		
+		if(sqrt(pow(proc_acc_x, 2) + pow(proc_acc_y, 2) + pow(proc_acc_z, 2)) < 0.6){
+			xSemaphoreGive(xSemaphoreHouseDown);
+		}
+		const FusionVector gyroscope = {proc_gyr_x, proc_gyr_y, proc_gyr_z};
+		const FusionVector accelerometer = {proc_acc_x, proc_acc_y, proc_acc_z};
+		
+		// Tempo entre amostras
+		float dT = 0.1;
 
+		// aplica o algoritmo
+		FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, dT);
+
+		// dados em pitch roll e yaw
+		const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+
+		printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw);
+		roll = euler.angle.roll;
+		pitch = euler.angle.pitch;
+		yaw = euler.angle.yaw;
+
+		//liberar semaforo se estiver em queda livre
+
+		if (euler.angle.pitch < -25){
+			d = 4;
+			} else if (euler.angle.pitch > 25) {
+			d = FRENTE;
+			} else if (euler.angle.roll < -25){
+			d = ESQUERDA;
+			} else if (euler.angle.roll > 25){
+			d = DIREITA;
+			} else {
+			d = 4;
+		}
+		xQueueSend(xQueueOrientacao, &d, 0);
 		// uma amostra a cada 1ms
-		vTaskDelay(1);
+		vTaskDelay(10);
+	}
+}
+
+static void task_orientacao(void *pvParameters) {
+	int direcao;
+	for (;;) {
+		if (xQueueReceive(xQueueOrientacao, &direcao, 10) == pdTRUE) {
+			if (direcao == ESQUERDA){
+				pio_clear(LED1, LED1_IDX_MASK);
+				pio_set(LED2, LED2_IDX_MASK);
+				pio_set(LED3, LED3_IDX_MASK);
+			}
+			if (direcao == FRENTE){
+				pio_clear(LED2, LED2_IDX_MASK);
+				pio_set(LED1, LED1_IDX_MASK);
+				pio_set(LED3, LED3_IDX_MASK);
+			}
+			if (direcao == DIREITA){
+				pio_clear(LED3, LED3_IDX_MASK);
+				pio_set(LED1, LED1_IDX_MASK);
+				pio_set(LED2, LED2_IDX_MASK);
+			}
+			if (direcao == 4){
+				pio_set(LED3, LED3_IDX_MASK);
+				pio_set(LED1, LED1_IDX_MASK);
+				pio_set(LED2, LED2_IDX_MASK);
+			}
+		}
 	}
 }
 
@@ -259,12 +419,27 @@ int main(void) {
   printf("-- Freertos Example --\n\r");
   printf("-- %s\n\r", BOARD_NAME);
   printf("-- Compiled: %s %s --\n\r", __DATE__, __TIME__);
+  xSemaphore = xSemaphoreCreateBinary();
+  	//create task orientacao
+	if (xTaskCreate(task_orientacao, "Orientacao", TASK_STACK_SIZE, NULL,
+	TASK_STACK_PRIORITY, NULL) != pdPASS) {
+		printf("Failed to create test orientacao task\r\n");
+	}
 
   if (xTaskCreate(task_imu, "IMU", TASK_IMU_STACK_SIZE, NULL,
                   TASK_IMU_STACK_PRIORITY, NULL) != pdPASS) {
     printf("Failed to create test IMU task\r\n");
   }
+  if (xSemaphore == NULL) {
+	  printf("Falha ao criar o semï¿½foro\n");
+	  return 1;
+  }
 
+  // Criaï¿½ï¿½o da tarefa house_down
+  if (xTaskCreate(task_house_down, "HouseDown", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+	  printf("Falha ao criar a tarefa house_down\n");
+	  return 1;
+  }
 
   /* Create task to make led blink */
   if (xTaskCreate(task_led, "Led", TASK_LED_STACK_SIZE, NULL,
